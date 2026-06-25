@@ -4,8 +4,7 @@ A running, detailed record of **how** the project was built and **why** each
 decision was made. Written for two audiences: the engineer continuing the work,
 and the interviewer who will discuss the thought process behind the app.
 
-This document grows phase by phase. It currently covers **Phase 1** and
-**Phase 2**.
+This document grows phase by phase. It currently covers **Phases 1–4**.
 
 ---
 
@@ -485,21 +484,138 @@ evaluator log in and see a populated app immediately.
 
 ---
 
+## Phase 4 — Frontend foundation + Authentication
+
+**Goal:** stand up the React app and make auth work end-to-end — register, log
+in, stay logged in across reloads, and be redirected away from protected pages
+when logged out — using the *same* security model as the backend (access token in
+memory, refresh in the httpOnly cookie).
+
+### What was added
+
+```
+client/
+├─ .env / .env.example         # VITE_API_URL
+├─ components.json             # shadcn config
+├─ vite.config.ts             # react + tailwind plugins + "@" alias
+├─ index.css                  # Tailwind v4 import + shadcn theme tokens
+└─ src/
+   ├─ main.tsx                # providers: Query, Router, Auth, Toaster
+   ├─ App.tsx                 # route table
+   ├─ lib/
+   │  ├─ api.ts              # axios instance + single-flight refresh
+   │  └─ utils.ts            # cn() (shadcn)
+   ├─ auth/
+   │  ├─ auth-context.ts     # context + value type
+   │  ├─ AuthProvider.tsx    # user state, bootstrap, login/register/logout
+   │  ├─ useAuth.ts          # hook
+   │  ├─ ProtectedRoute.tsx  # redirect if logged out
+   │  └─ RoleRoute.tsx       # redirect if wrong role (admin gate)
+   ├─ pages/
+   │  ├─ Login.tsx
+   │  ├─ Register.tsx
+   │  └─ Dashboard.tsx       # placeholder (real UI in Phase 5)
+   ├─ components/
+   │  ├─ ui/                 # shadcn: button, input, label, card, sonner
+   │  └─ full-screen-loader.tsx
+   └─ types/index.ts         # shared User/Role types
+```
+
+### Stack chosen (and why)
+
+| Tool | Role | Why |
+| --- | --- | --- |
+| Vite + React 19 + TS | foundation | assignment-preferred; fast HMR |
+| Tailwind **v4** + shadcn/ui | styling/components | v4 uses a Vite plugin (no `tailwind.config.js`); shadcn = accessible components whose code we own |
+| React Router | routing | standard |
+| TanStack Query | server state | caching/refetch (used heavily from Phase 5) |
+| axios | HTTP | interceptors needed for the refresh flow |
+| react-hook-form + zod | forms | typed validation mirroring the backend rules |
+
+### The authentication flow (the substance of this phase)
+
+**1. Access token in memory only (`lib/api.ts`).** A module-level variable holds
+the access token; a request interceptor adds `Authorization: Bearer …`. It is
+**never** in localStorage — same reasoning as the backend (XSS can't read it).
+The axios instance uses `withCredentials: true` so the httpOnly refresh cookie is
+sent.
+
+**2. Silent refresh on startup (`AuthProvider`).** Because the in-memory token is
+lost on reload, on mount the provider calls `POST /auth/refresh` once (cookie-
+based) → on success it stores a new access token and loads `/auth/me`; on failure
+the user is simply logged out. **This is how the session survives reloads without
+localStorage.**
+
+**3. Single-flight refresh interceptor (the tricky part).** On any `401`, the
+response interceptor refreshes the token and retries the original request. If
+several requests 401 at once, only **one** refresh runs — the rest wait in a
+queue and are replayed with the new token. Without this "refresh mutex" you get a
+storm of duplicate refreshes (and risk infinite loops).
+
+**4. No refresh on auth endpoints.** A 401 from `/auth/login` means *wrong
+password*, not *expired token* — so the interceptor explicitly skips refresh for
+`/auth/login|register|refresh`. (Forgetting this is a classic infinite-loop bug.)
+
+**5. Auto-login after register.** `register()` calls the register endpoint then
+immediately `login()`, so a new user lands straight on the dashboard instead of
+being bounced to the login screen.
+
+**6. Route guards.** `ProtectedRoute` shows a loader while the startup refresh is
+in flight (so the login page doesn't flash), then redirects to `/login` if there
+is no user — remembering the intended destination so login can send them back.
+`RoleRoute role="admin"` is ready for the admin-only pages in later phases.
+
+### Key decisions & gotchas
+
+- **Tailwind v4, not v3.** Setup is the `@tailwindcss/vite` plugin + a single
+  `@import "tailwindcss"` in `index.css` with the shadcn theme as CSS variables —
+  there is no `tailwind.config.js`.
+- **`baseUrl` is deprecated in TS 6.** With `moduleResolution: "bundler"`, the
+  `@/*` path alias works **without** `baseUrl` (paths resolve relative to the
+  tsconfig), so we dropped it to avoid the deprecation error. The matching Vite
+  alias lives in `vite.config.ts`.
+- **Dev cookies just work; prod is already handled.** On localhost,
+  `:5173`↔`:5000` are *same-site* (same-site ignores port), so the `SameSite=Lax`
+  refresh cookie is sent. In production they're cross-site — which is exactly why
+  the backend switches to `SameSite=None; Secure`. No code change needed.
+- **Fast-Refresh-friendly file split.** The context object, provider component,
+  and `useAuth` hook live in separate files so the linter's "only export
+  components" rule stays happy.
+- **New Vite scaffold uses `oxlint`** (not ESLint) for the client. Lint is clean
+  apart from one warning inside shadcn's generated `button.tsx` (it exports
+  `buttonVariants` next to the component — shadcn's standard pattern, left as-is).
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| `tsc -b` typecheck | clean |
+| `oxlint` | clean (only the shadcn `button.tsx` warning) |
+| `vite build` (production) | success (214 modules) |
+| Dev server serves app | `<title>Task Manager</title>` |
+| Backend + frontend run together | both up; integration live |
+
+> **Browser flow to confirm manually:** register → land on dashboard; reload →
+> still logged in (silent refresh); logout → redirected to `/login`; visit
+> `/dashboard` while logged out → redirected; wrong password → inline error.
+
+---
+
 ## Current status
 
 - ✅ **Phase 1** — Monorepo + backend foundation
 - ✅ **Phase 2** — Auth + RBAC
 - ✅ **Phase 3** — Task model + CRUD + RBAC scoping + filtering/search + seed
-- ⏭️ **Phase 4 (next)** — Frontend auth: login/register UI, protected routes, axios refresh interceptor
+- ✅ **Phase 4** — Frontend foundation + auth (login/register, guards, refresh)
+- ⏭️ **Phase 5 (next)** — Task UI: list (table + cards), detail page, create/edit forms
 
-The **entire backend API is now feature-complete** for the core requirements.
-Remaining phases are frontend + bonus features + deployment.
+The backend API is feature-complete; the frontend now has a working auth shell.
+Next phases build the task UI, bonus features, and deployment.
 
 ### Roadmap (remaining)
 
 | Phase | Scope |
 | --- | --- |
-| 4 | Frontend auth: login/register UI, protected routes, axios refresh interceptor |
 | 5 | Task UI: list (table + cards), detail page, create/edit forms |
 | 6 | Kanban board (drag-drop) + dashboard stats |
 | 7 | AI features (Gemini): task description/priority suggester, admin standup summary |
