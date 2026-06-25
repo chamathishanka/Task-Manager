@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/card";
 
 const schema = z.object({
-  email: z.string().email("Enter a valid email"),
+  email: z.email("Enter a valid email"),
   password: z.string().min(1, "Password is required"),
 });
 type FormValues = z.infer<typeof schema>;
@@ -37,7 +37,7 @@ export default function Login() {
 
   const from =
     (location.state as { from?: { pathname: string } } | null)?.from
-      ?.pathname ?? "/dashboard";
+      ?.pathname ?? "/tasks";
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);

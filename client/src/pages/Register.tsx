@@ -20,7 +20,7 @@ import {
 const schema = z
   .object({
     name: z.string().min(2, "Name must be at least 2 characters"),
-    email: z.string().email("Enter a valid email"),
+    email: z.email("Enter a valid email"),
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string(),
   })
@@ -45,7 +45,7 @@ export default function Register() {
     setServerError(null);
     try {
       await registerUser(values.name, values.email, values.password);
-      navigate("/dashboard", { replace: true });
+      navigate("/tasks", { replace: true });
     } catch (err) {
       setServerError(getErrorMessage(err, "Registration failed"));
     }

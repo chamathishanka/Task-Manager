@@ -4,7 +4,7 @@ A running, detailed record of **how** the project was built and **why** each
 decision was made. Written for two audiences: the engineer continuing the work,
 and the interviewer who will discuss the thought process behind the app.
 
-This document grows phase by phase. It currently covers **Phases 1–4**.
+This document grows phase by phase. It currently covers **Phases 1–5**.
 
 ---
 
@@ -601,23 +601,128 @@ is no user — remembering the intended destination so login can send them back.
 
 ---
 
+## Phase 5 — Task UI (list, detail, create/edit)
+
+**Goal:** turn the API into a real, usable task manager — a filterable/searchable
+task list (table **and** card views), a detail page, and a create/edit modal —
+inside an app shell.
+
+### Backend addition
+
+- **`GET /api/users`** (auth required) → minimal `[{ _id, name, email, role }]`
+  for the assignee dropdown. Same layered pattern (service → controller → route).
+  *Not* full user management — just enough to assign tasks.
+
+### Frontend added
+
+```
+client/src/
+├─ api/            tasks.ts, users.ts          ← typed API calls
+├─ hooks/          useTasks.ts, useUsers.ts    ← TanStack Query wrappers
+├─ lib/            format.ts                    ← date + overdue + initials helpers
+├─ components/
+│  ├─ layout/      AppLayout.tsx               ← sidebar + topbar shell
+│  └─ tasks/       StatusBadge, PriorityBadge, FilterBar, TaskTable,
+│                  TaskCard, TaskStatusSelect, TaskRowActions,
+│                  TaskFormDialog, DeleteTaskDialog
+└─ pages/          TasksList.tsx, TaskDetail.tsx (+ Dashboard placeholder)
+```
+
+shadcn components pulled in: `table, select, dialog, textarea, badge,
+dropdown-menu, skeleton, popover, calendar, separator, avatar, alert-dialog`.
+
+### How it's structured
+
+**1. Layered data access.** `api/*` does the typed axios calls; `hooks/*` wrap
+them in TanStack Query. Pages never call axios directly — they use hooks. This
+gives caching, background refetch, and a single place for cache rules.
+
+**2. App shell (`AppLayout`).** Sidebar (Dashboard / Tasks) + topbar (avatar,
+name, role, logout). All protected pages render through it via a nested
+`<Outlet/>`, so navigation chrome is defined once.
+
+**3. The task list (`TasksList`) — the centerpiece.**
+- **Table view + card view** toggle (same data, two presentations).
+- **Filters live in the URL** (`?status=Open&priority=High&page=2`) via
+  `useSearchParams`, so the view is shareable and survives refresh. `parseFilters`
+  reads them; `patchFilters` writes them (with `replace: true` to avoid history
+  spam).
+- **Debounced search** (400 ms) inside `FilterBar` so we don't refetch on every
+  keystroke.
+- **Pagination** driven by the API's `pagination` metadata; `placeholderData`
+  keeps the current page on screen while the next loads (no flash to empty).
+- **Loading skeletons, empty state, and error state** are all handled.
+
+**4. Create/edit (`TaskFormDialog`).** A single modal does both — `task` prop
+present = edit, absent = create. react-hook-form + zod, with a shadcn
+calendar-popover date picker, an assignee `Select` (fed by `useUsers`), and a
+sentinel `"unassigned"` value mapped to `undefined` (Radix selects can't have an
+empty-string item). Success/error show as sonner toasts.
+
+**5. Detail page (`TaskDetail`).** Full task info with edit/delete actions;
+delete navigates back to the list.
+
+### Notable decisions & gotchas
+
+**1. Optimistic status changes with rollback (`useUpdateTask`).** Changing a
+task's status from the table's inline `Select` updates the cache *immediately*
+via `onMutate` (snapshot → patch every cached list), rolls back `onError`, and
+reconciles `onSettled` with a refetch. To avoid corrupting the populated
+`assignedTo` object, the optimistic patch only touches **scalar** fields
+(title/description/priority/status/dueDate), never the assignee reference.
+
+**2. Query-key design.** Keys are `["tasks","list",filters]` and
+`["tasks","detail",id]`. Mutations invalidate `["tasks","list"]` (all filtered
+lists) and write the fresh task into the detail cache. TanStack Query hashes keys
+structurally, so passing a freshly-parsed `filters` object each render does **not**
+cause refetches unless the contents actually change.
+
+**3. Stable callbacks for the debounce.** `patchFilters` is wrapped in
+`useCallback` keyed on `searchParams`, so `FilterBar`'s debounce effect isn't
+reset by unrelated parent re-renders.
+
+**4. Zod 4 email API.** `z.string().email()` is deprecated in Zod 4; switched the
+auth forms to `z.email()`.
+
+**5. Overdue rule** lives in one helper: `dueDate < now && status !== "Done"` —
+used by both table and card to render the due date in red.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Backend `GET /api/users` (auth) | 4 users returned; 401 without token |
+| `tsc -b` typecheck (client) | clean |
+| `oxlint` | clean (only the shadcn `button.tsx`/`badge.tsx` variant-export warnings) |
+| `vite build` (production) | success |
+
+> **Bundle note:** the production JS is ~705 kB (216 kB gzipped) — fine for now;
+> route-level code-splitting (`React.lazy`) is queued as a Phase 8 polish item.
+
+> **Browser flow to confirm:** create a task → it appears; switch table/card;
+> change status inline → updates instantly (optimistic); filter/search → URL
+> updates and list narrows; open detail → edit → save; delete → confirm + toast;
+> overdue tasks show red; a non-admin sees only their tasks, admin sees all.
+
+---
+
 ## Current status
 
 - ✅ **Phase 1** — Monorepo + backend foundation
 - ✅ **Phase 2** — Auth + RBAC
 - ✅ **Phase 3** — Task model + CRUD + RBAC scoping + filtering/search + seed
 - ✅ **Phase 4** — Frontend foundation + auth (login/register, guards, refresh)
-- ⏭️ **Phase 5 (next)** — Task UI: list (table + cards), detail page, create/edit forms
+- ✅ **Phase 5** — Task UI (list table/cards, filters, detail, create/edit modal)
+- ⏭️ **Phase 6 (next)** — Kanban board (drag-drop) + dashboard stats
 
-The backend API is feature-complete; the frontend now has a working auth shell.
-Next phases build the task UI, bonus features, and deployment.
+The app is now a fully usable task manager end-to-end. Remaining phases add the
+Kanban/dashboard bonuses, AI features, polish, and deployment.
 
 ### Roadmap (remaining)
 
 | Phase | Scope |
 | --- | --- |
-| 5 | Task UI: list (table + cards), detail page, create/edit forms |
 | 6 | Kanban board (drag-drop) + dashboard stats |
 | 7 | AI features (Gemini): task description/priority suggester, admin standup summary |
-| 8 | Tests + UX polish (loading/empty/error states, dark mode, overdue highlighting) |
+| 8 | Tests + UX polish (dark mode, code-splitting, loading/empty/error refinements) |
 | 9 | Deploy (Vercel + Render + Atlas) + finalize README |
