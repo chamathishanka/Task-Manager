@@ -128,7 +128,11 @@ export default function Login() {
               <p className="text-sm text-destructive">{serverError}</p>
             )}
 
-            <Button type="submit" className="w-full" disabled={busy}>
+            <Button
+              type="submit"
+              className="bg-brand-gradient w-full border-0 text-white hover:opacity-90"
+              disabled={busy}
+            >
               {isSubmitting && <Loader2 className="size-4 animate-spin" />}
               Log in
             </Button>
@@ -141,7 +145,7 @@ export default function Login() {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
+                <span className="bg-card/70 px-2 text-muted-foreground backdrop-blur-xl">
                   Quick demo login
                 </span>
               </div>

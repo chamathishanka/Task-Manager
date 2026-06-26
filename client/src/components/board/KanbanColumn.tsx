@@ -3,6 +3,14 @@ import { useDroppable } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import type { TaskStatus } from "@/types";
 
+const statusDot: Record<TaskStatus, string> = {
+  Open: "bg-blue-500",
+  "In Progress": "bg-amber-500",
+  Testing: "bg-purple-500",
+  Blocked: "bg-red-500",
+  Done: "bg-emerald-500",
+};
+
 interface Props {
   status: TaskStatus;
   count: number;
@@ -21,7 +29,10 @@ export function KanbanColumn({ status, count, children }: Props) {
       )}
     >
       <div className="flex items-center justify-between border-b px-3 py-2.5">
-        <span className="text-sm font-medium">{status}</span>
+        <span className="flex items-center gap-2 text-sm font-medium">
+          <span className={cn("size-2 rounded-full", statusDot[status])} />
+          {status}
+        </span>
         <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
           {count}
         </span>

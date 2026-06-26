@@ -159,9 +159,8 @@ export function TaskFormDialog({ open, onOpenChange, task }: Props) {
               <Label htmlFor="title">Title</Label>
               <Button
                 type="button"
-                variant="ghost"
                 size="sm"
-                className="h-7 gap-1 text-xs text-muted-foreground"
+                className="bg-brand-gradient h-7 gap-1 border-0 text-xs text-white hover:opacity-90"
                 disabled={suggest.isPending}
                 onClick={handleSuggest}
               >

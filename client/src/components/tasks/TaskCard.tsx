@@ -23,7 +23,7 @@ export function TaskCard({ task, onEdit, onDelete }: Props) {
   const overdue = isOverdue(task.dueDate, task.status);
 
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col transition-colors hover:border-primary/50">
       <CardHeader className="flex-row items-start justify-between gap-2 space-y-0">
         <Link
           to={`/tasks/${task._id}`}

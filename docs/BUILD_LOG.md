@@ -918,6 +918,11 @@ A batch of UX/correctness improvements after first hands-on testing.
 - **Fixed-height app shell + collapsible sidebar.** The shell is `h-svh` with
   only `<main>` scrolling, so the sidebar (and its pinned user/logout footer)
   stays put. The sidebar collapses to an icon rail (persisted to `localStorage`).
+- **Visual polish pass.** Full-bleed image background on the auth pages (glass
+  card + darkening gradient); the brand gradient reused as the "magic" cue on AI
+  actions (✨ Suggest, Generate standup) and the auth CTAs; harmonized chart
+  colors (violet→teal); slim themed scrollbars; card hover states; status-colored
+  dots on board columns; branded favicon; and an empty-state illustration.
 
 > Still queued for Phase 8: route-level **code-splitting** (`React.lazy`) — the
 > bundle is ~1.27 MB after adding charts + markdown — and a few **tests**.

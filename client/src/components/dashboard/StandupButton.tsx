@@ -29,7 +29,10 @@ export function StandupButton() {
 
   return (
     <>
-      <Button variant="outline" onClick={handleOpen}>
+      <Button
+        onClick={handleOpen}
+        className="bg-brand-gradient border-0 text-white hover:opacity-90"
+      >
         <Sparkles className="size-4" />
         Generate standup
       </Button>

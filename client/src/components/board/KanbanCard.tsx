@@ -32,7 +32,7 @@ export function KanbanCard({ task, onEdit, onDelete }: Props) {
       {...listeners}
       {...attributes}
       className={cn(
-        "cursor-grab touch-none rounded-md border bg-background p-3 shadow-sm active:cursor-grabbing",
+        "cursor-grab touch-none rounded-md border bg-background p-3 shadow-sm transition-colors hover:border-primary/50 active:cursor-grabbing",
         isDragging && "opacity-40"
       )}
     >
