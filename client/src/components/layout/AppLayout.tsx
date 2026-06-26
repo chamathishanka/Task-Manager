@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, ListTodo, LogOut } from "lucide-react";
+import { KanbanSquare, LayoutDashboard, ListTodo, LogOut } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/format";
@@ -12,6 +12,7 @@ import {
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/tasks", label: "Tasks", icon: ListTodo },
+  { to: "/board", label: "Board", icon: KanbanSquare },
 ];
 
 export function AppLayout() {
@@ -89,7 +90,9 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6">
+        {/* min-w-0 + overflow-x-clip keep a wide child (e.g. the Kanban board)
+            scrolling inside its own container instead of stretching the page. */}
+        <main className="min-w-0 flex-1 overflow-x-clip p-4 md:p-6">
           <Outlet />
         </main>
       </div>

@@ -4,7 +4,7 @@ A running, detailed record of **how** the project was built and **why** each
 decision was made. Written for two audiences: the engineer continuing the work,
 and the interviewer who will discuss the thought process behind the app.
 
-This document grows phase by phase. It currently covers **Phases 1–5**.
+This document grows phase by phase. It currently covers **Phases 1–6**.
 
 ---
 
@@ -706,6 +706,103 @@ used by both table and card to render the due date in red.
 
 ---
 
+## Phase 6 — Kanban board + Dashboard stats
+
+**Goal:** the two most visual bonus features — a drag-and-drop Kanban board where
+moving a card changes its status, and a dashboard with real metrics and charts.
+
+### Backend addition — stats aggregation
+
+`GET /api/tasks/stats` runs a **MongoDB aggregation** (`$match` for role scope →
+`$group`) and returns counts by status, by priority, plus `total / done /
+inProgress / overdue` — computed **in the database**, not by shipping every task
+to the client.
+
+- **Role-scoped in the pipeline.** The `$match` reuses the same scope rule, but in
+  an aggregation Mongoose does **not** auto-cast strings to ObjectIds, so the
+  user id is wrapped with `new mongoose.Types.ObjectId(id)` for the match to work.
+- **Overdue is computed server-side** via `$cond` (`status != Done && dueDate !=
+  null && dueDate < now`).
+- Results are normalized to a full record (every status/priority present, zero-
+  filled) so the frontend never has to guess missing buckets.
+- **Route ordering matters:** `GET /tasks/stats` is registered **before**
+  `GET /tasks/:id`, otherwise `"stats"` would be captured as an `:id`.
+
+### Frontend added
+
+```
+client/src/
+├─ hooks/         useTaskStats.ts
+├─ components/
+│  ├─ dashboard/  StatCard, StatusChart, PriorityChart, UpcomingTasks
+│  └─ board/      KanbanColumn, KanbanCard
+└─ pages/         Dashboard.tsx (rebuilt), Board.tsx
+```
+
+New deps: `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`, `recharts`
++ shadcn `chart`.
+
+### Dashboard
+
+- **4 stat cards** (Total / In progress / Overdue / Completed).
+- **Two charts** via shadcn's `chart` wrapper over **recharts**: a status donut
+  (`Pie`) and a priority bar chart, themed with the `--chart-*` CSS variables.
+- **Upcoming & overdue list:** reuses `useTasks` sorted by due date, filtered
+  client-side to dated, not-Done tasks (overdue first).
+- Everything is **role-scoped automatically** because it rides the same API.
+
+### Kanban board
+
+- Five columns = the five statuses; cards grouped client-side from a single
+  `useTasks({ limit: 100 })` fetch (boards don't paginate). Search / priority /
+  assignee filters apply (local state + a debounced search).
+- **dnd-kit:** each column is a `useDroppable`; each card a `useDraggable`.
+  Dropping a card in a different column fires `useUpdateTask({ status })` — the
+  **same optimistic mutation from Phase 5**, so the card moves instantly and the
+  dashboard/list stay in sync.
+
+### Notable decisions & gotchas
+
+**1. Whole-card drag with an activation distance.** The entire card is the
+draggable (not a tiny grip handle — that hurt discoverability; users drag the
+card body). A `PointerSensor` `activationConstraint: { distance: 8 }` means a
+**stationary click** still reaches the title link, while moving past 8px starts a
+drag. The actions menu wrapper calls `stopPropagation` on `pointerDown` so
+opening it never begins a drag.
+
+**2. No persisted ordering.** Cross-column moves (status) are the meaningful
+action and they persist; within-column order is **not** stored — the data model
+has no `order` field and the assignment only needs the status workflow. A clear,
+intentional scope decision rather than building an ordering system.
+
+**3. Cache invalidation widened to `["tasks"]`.** Mutations now invalidate the
+root tasks key (not just `["tasks","list"]`) so the **stats** query
+(`["tasks","stats"]`) also refreshes after any create/update/delete — the
+dashboard never drifts from the list/board.
+
+**4. `DragOverlay` uses a lightweight preview**, not the real `KanbanCard`, to
+avoid registering a second draggable with the same id during a drag.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| `GET /api/tasks/stats` as admin | total 14, correct status/priority buckets |
+| `GET /api/tasks/stats` as user (scoped) | total 10 (subset), buckets sum correctly |
+| stats without token | 401 |
+| `tsc -b` typecheck (client) | clean |
+| `oxlint` | clean (only shadcn `button`/`badge` variant-export warnings) |
+| `vite build` (production) | success |
+
+> **Bundle note:** recharts pushes the bundle to ~1.1 MB (337 kB gzipped).
+> Route-level code-splitting (`React.lazy`) is the planned Phase 8 fix.
+
+> **Browser flow to confirm:** dashboard shows live counts + charts; drag a card
+> to another column → status updates and survives reload; the list view reflects
+> the change; admin vs user see different totals.
+
+---
+
 ## Current status
 
 - ✅ **Phase 1** — Monorepo + backend foundation
@@ -713,16 +810,16 @@ used by both table and card to render the due date in red.
 - ✅ **Phase 3** — Task model + CRUD + RBAC scoping + filtering/search + seed
 - ✅ **Phase 4** — Frontend foundation + auth (login/register, guards, refresh)
 - ✅ **Phase 5** — Task UI (list table/cards, filters, detail, create/edit modal)
-- ⏭️ **Phase 6 (next)** — Kanban board (drag-drop) + dashboard stats
+- ✅ **Phase 6** — Kanban board (drag-drop) + dashboard stats
+- ⏭️ **Phase 7 (next)** — AI features (Gemini): task suggester + admin standup summary
 
-The app is now a fully usable task manager end-to-end. Remaining phases add the
-Kanban/dashboard bonuses, AI features, polish, and deployment.
+All assignment requirements **and** several bonuses are now complete. Remaining
+phases add AI features, polish, and deployment.
 
 ### Roadmap (remaining)
 
 | Phase | Scope |
 | --- | --- |
-| 6 | Kanban board (drag-drop) + dashboard stats |
 | 7 | AI features (Gemini): task description/priority suggester, admin standup summary |
 | 8 | Tests + UX polish (dark mode, code-splitting, loading/empty/error refinements) |
 | 9 | Deploy (Vercel + Render + Atlas) + finalize README |

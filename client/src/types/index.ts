@@ -77,3 +77,12 @@ export interface TaskInput {
   dueDate?: string;
   assignedTo?: string;
 }
+
+export interface TaskStats {
+  total: number;
+  done: number;
+  inProgress: number;
+  overdue: number;
+  byStatus: Record<TaskStatus, number>;
+  byPriority: Record<TaskPriority, number>;
+}
