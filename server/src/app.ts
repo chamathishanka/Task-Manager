@@ -12,6 +12,9 @@ import aiRoutes from "./routes/ai.routes.js";
 export function createApp() {
     const app = express();
 
+    // Trust Render's load-balancer so secure cookies and rate-limit IPs work
+    app.set("trust proxy", 1);
+
     app.use(helmet());
     app.use(cors({ origin: env.clientUrl, credentials: true }));
     app.use(express.json());
