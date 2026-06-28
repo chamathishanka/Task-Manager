@@ -31,7 +31,7 @@ export function StatusChart({ byStatus }: { byStatus: TaskStats["byStatus"] }) {
   const hasData = data.some((d) => d.count > 0);
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle className="text-base">Tasks by status</CardTitle>
       </CardHeader>
