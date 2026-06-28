@@ -12,7 +12,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <StandupButton />
       </div>
@@ -54,12 +54,12 @@ export default function Dashboard() {
 
       {/* Charts */}
       {isLoading || !stats ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2 *:min-w-0">
           <Skeleton className="h-85 w-full rounded-xl" />
           <Skeleton className="h-85 w-full rounded-xl" />
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2 *:min-w-0">
           <StatusChart byStatus={stats.byStatus} />
           <PriorityChart byPriority={stats.byPriority} />
         </div>
